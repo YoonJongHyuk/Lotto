@@ -4,13 +4,14 @@ import requests
 import re
 import plotly.graph_objects as go
 import pandas as pd
+from bs4 import BeautifulSoup
 
 # import os
 # os.system("streamlit run lotto.py")
 
 # ------------------- 함수 정의 먼저 -------------------
 
-def generate_ultra_filtered_combinations(fixed_numbers, num_sets=100):
+def generate_ultra_filtered_combinations(fixed_numbers, excluded_numbers=[], num_sets=100):
     def get_band(num):
         if 1 <= num <= 10:
             return '1-10'
@@ -22,6 +23,63 @@ def generate_ultra_filtered_combinations(fixed_numbers, num_sets=100):
             return '31-40'
         elif 41 <= num <= 45:
             return '41-45'
+
+    def has_too_many_consecutive(numbers):
+        numbers = sorted(numbers)
+        consecutive_count = 0
+        for i in range(len(numbers)-1):
+            if numbers[i+1] - numbers[i] == 1:
+                consecutive_count += 1
+        return consecutive_count >= 2
+
+    result = []
+    tries = 0
+    max_tries = num_sets * 50
+
+    while len(result) < num_sets and tries < max_tries:
+        tries += 1
+        comb = random.sample(fixed_numbers, 6)
+
+        # ✅ 제외수 필터 추가
+        if any(n in excluded_numbers for n in comb):
+            continue
+
+        even = [n for n in comb if n % 2 == 0]
+        if not (3 <= len(even) <= 4):
+            continue
+
+        bands = {get_band(n) for n in comb}
+        if len(bands) < 4:
+            continue
+
+        band_counter = {}
+        for n in comb:
+            b = get_band(n)
+            band_counter[b] = band_counter.get(b, 0) + 1
+        if any(count > 2 for count in band_counter.values()):
+            continue
+
+        if max(comb) - min(comb) < 15:
+            continue
+
+        far_apart = [abs(a-b) >= 10 for a in comb for b in comb if a != b]
+        if far_apart.count(True) < 2:
+            continue
+
+        if has_too_many_consecutive(comb):
+            continue
+
+        total_sum = sum(comb)
+        if not (100 <= total_sum <= 200):
+            continue
+
+        if sorted(comb) in result:
+            continue
+
+        result.append(sorted(comb))
+
+    return result
+
 
     def has_too_many_consecutive(numbers):
         numbers = sorted(numbers)
@@ -92,17 +150,25 @@ def check_prize(user_numbers, winning_numbers, bonus_number):
     else:
         return '꽝'
 
+import requests
+import re
+
 def get_latest_round_number():
-    url = "https://www.dhlottery.co.kr/gameResult.do?method=byWin"
+    url = "https://dhlottery.co.kr/common.do?method=main"
+    
+
     try:
-        res = requests.get(url)
-        if res.status_code == 200:
-            match = re.search(r"제(\d+)회", res.text)
-            if match:
-                return int(match.group(1))
+
+        html = requests.get(url).text
+        soup = BeautifulSoup(html, "html.parser")
+        max_numb = soup.find(name="strong", attrs={"id": "lottoDrwNo"}).text
+        return int(max_numb)
+
     except Exception as e:
         print("최신 회차 가져오기 실패:", e)
-    return 1168  # 기본값
+    #return 1168
+
+
 
 
 def get_multiple_lotto_data(start_drw_no, count):
@@ -177,6 +243,11 @@ def build_html_result_df(df, fixed_numbers):
     return df_html
 
 
+def is_excluded(combo, excluded):
+    return any(n in excluded for n in combo)
+
+
+
 # ------------------- 여기까지 함수 영역 -------------------
 
 # ------------------- Streamlit UI 영역 시작 -------------------
@@ -189,11 +260,21 @@ fixed_numbers_selected = st.sidebar.multiselect(
     default=[7, 27, 14, 23, 10, 33, 12, 31, 38, 42]
 )
 
+
+
 if len(fixed_numbers_selected) < 6 or len(fixed_numbers_selected) > 12:
     st.sidebar.error("고정수는 6개 이상 12개 이하로 선택해주세요.")
     fixed_numbers = None
 else:
     fixed_numbers = fixed_numbers_selected
+
+
+st.sidebar.header("제외수 직접 선택")
+
+excluded_numbers = st.sidebar.multiselect(
+    "제외할 번호 선택", options=list(range(1, 46)), default=[]
+)
+
 
 st.title("로또 초강화 필터 조합 생성기")
 
