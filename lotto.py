@@ -6,6 +6,8 @@ import re
 import plotly.graph_objects as go
 import pandas as pd
 from bs4 import BeautifulSoup
+from datetime import datetime
+import os
 
 
 # ------------------- 번호 조합 필터링 함수 -------------------
@@ -174,6 +176,19 @@ if st.session_state.combinations:
             df_result = build_analysis_result_dataframe(sim_results, st.session_state.combinations)
             styled_df = build_html_result_df(df_result, fixed_numbers)
             st.write(styled_df.to_html(escape=False, index=False), unsafe_allow_html=True)
+            
+            # 엑셀 파일로 저장
+            save_dir = os.path.join(os.path.expanduser("~"), "Desktop", "로또번호")
+            #save_dir = os.path.join("바탕화면", "로또번호")
+            # 폴더가 없으면 생성
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+                
+            current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+            excel_filename = f"lotto_simulation_{current_time}.xlsx"
+            full_path = os.path.join(save_dir, excel_filename)
+            df_result.to_excel(full_path, index=False)
+            st.success(f"✅ 시뮬레이션 결과가 '{full_path}' 파일로 저장되었습니다!")
 
     elif analysis_mode == "최근 회차 분석":
         num_recent = st.number_input("최근 몇 회 분석할까요?", 1, 50, 10)
@@ -191,3 +206,16 @@ if st.session_state.combinations:
             df_result = build_analysis_result_dataframe(round_results, st.session_state.combinations)
             styled_df = build_html_result_df(df_result, expected_numbers)
             st.write(styled_df.to_html(escape=False, index=False), unsafe_allow_html=True)
+            
+            # 엑셀 파일로 저장
+            save_dir = os.path.join(os.path.expanduser("~"), "Desktop", "로또번호")
+            #save_dir = os.path.join("바탕화면", "로또번호")
+            # 폴더가 없으면 생성
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+                
+            current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+            excel_filename = f"lotto_recent_analysis_{current_time}.xlsx"
+            full_path = os.path.join(save_dir, excel_filename)
+            df_result.to_excel(full_path, index=False)
+            st.success(f"✅ 분석 결과가 '{full_path}' 파일로 저장되었습니다!")
